@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rod Cutting — Interactive DP Visualization</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --purple: #a371f7;
+      --compare: #f0883e;
+      --transition: 220ms ease;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.45; }
+    h1 { font-size: 1.35rem; margin: 0 0 0.5rem; font-weight: 600; }
+    h2 { font-size: 1.05rem; margin: 1.25rem 0 0.5rem; color: var(--accent); }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 1rem; }
+    .layout { display: flex; gap: 1.25rem; align-items: flex-start; }
+    .controls {
+      flex: 0 0 420px; max-width: 100%;
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.1rem;
+    }
+    .main {
+      flex: 1; min-width: 0;
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.1rem;
+    }
+    @media (max-width: 979px) {
+      .layout { flex-direction: column; }
+      .controls { flex: 1 1 auto; width: 100%; }
+    }
+    label { display: block; font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0 0.25rem; }
+    input[type="number"], textarea {
+      width: 100%; padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text); font-size: 0.9rem;
+    }
+    textarea { min-height: 64px; font-family: ui-monospace, monospace; resize: vertical; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+    button {
+      cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--text);
+      padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.85rem;
+      transition: background var(--transition), border-color var(--transition);
+    }
+    button:hover:not(:disabled) { background: #21262d; border-color: var(--accent); }
+    button.primary { background: #238636; border-color: #238636; color: #fff; }
+    .speed-wrap input[type="range"] { width: 100%; }
+    .meta { font-size: 0.82rem; color: var(--text-muted); margin: 0.35rem 0; }
+    .step-badge { font-family: ui-monospace, monospace; background: var(--bg); padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); display: inline-block; }
+    .status { padding: 0.35rem 0.6rem; border-radius: 6px; display: inline-block; font-size: 0.8rem; font-weight: 600; }
+    .status.idle { background: #21262d; color: var(--text-muted); }
+    .status.ready { background: rgba(88,166,255,0.15); color: var(--accent); }
+    .status.playing { background: rgba(63,185,80,0.15); color: var(--green); }
+    .status.paused { background: rgba(210,153,34,0.15); color: var(--yellow); }
+    .status.done { background: rgba(163,113,247,0.15); color: var(--purple); }
+    .counters { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.35rem; font-size: 0.8rem; margin-top: 0.5rem; }
+    .counters span { color: var(--text-muted); }
+    .viz-block { margin-top: 1rem; padding: 0.75rem; background: var(--bg); border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; }
+    .viz-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.5rem; }
+    svg { display: block; max-width: 100%; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; font-size: 0.78rem; margin: 0.75rem 0 0; }
+    .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+    .explain {
+      margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(88,166,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; font-size: 0.9rem;
+    }
+    .dp-explain {
+      margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(63,185,80,0.08); border-left: 3px solid var(--green); border-radius: 0 6px 6px 0; font-size: 0.9rem;
+    }
+    .dp-explain h3 { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--green); }
+    .dp-explain ul { margin: 0.5rem 0; padding-left: 1.2rem; }
+    .dp-explain li { margin: 0.3rem 0; }
+    .pseudocode-wrap { margin-top: 1rem; max-height: 280px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: #0d1117; }
+    .pseudocode {
+      font-family: ui-monospace, monospace; font-size: 0.78rem; line-height: 1.55; padding: 0.75rem 0; margin: 0;
+      white-space: pre;
+    }
+    .pseudocode .line { display: flex; padding: 0.1rem 0.75rem; border-left: 3px solid transparent; transition: background var(--transition); }
+    .pseudocode .line.active { background: rgba(88,166,255,0.12); border-left-color: var(--accent); }
+    .pseudocode .ln { width: 2rem; color: var(--text-muted); flex-shrink: 0; user-select: none; }
+    .history-wrap { margin-top: 1rem; max-height: 200px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+    table.history { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+    table.history th, table.history td { border: 1px solid var(--border); padding: 0.35rem 0.5rem; text-align: left; }
+    table.history th { background: #21262d; position: sticky; top: 0; }
+    table.history tr { cursor: pointer; }
+    table.history tr.sel { background: rgba(163,113,247,0.15); }
+    details.edu { margin-top: 1rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; background: var(--bg); }
+    details.edu summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+    details.edu .inner { margin-top: 0.75rem; font-size: 0.88rem; color: var(--text-muted); }
+    .keybox { border: 1px dashed var(--yellow); background: rgba(210,153,34,0.08); padding: 0.6rem 0.75rem; border-radius: 8px; margin: 0.5rem 0; font-size: 0.85rem; }
+    /* Fixed viewport so wide/tall SVG actually overflows → real scrollbars */
+    .viz-chart {
+      overflow: visible;
+    }
+    .chart-scroll {
+      width: 100%;
+      max-width: 100%;
+      height: 520px;
+      box-sizing: border-box;
+      overflow-x: auto;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      margin-top: 0.5rem;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-gutter: stable;
+    }
+    /* Always show scroll tracks in supporting browsers (Firefox) */
+    .chart-scroll {
+      scrollbar-width: thin;
+    }
+    .chart-scroll svg {
+      display: block;
+      min-width: 1200px;
+      min-height: 600px;
+    }
+    .chart-scroll::-webkit-scrollbar {
+      width: 14px;
+      height: 14px;
+    }
+    .chart-scroll::-webkit-scrollbar-track {
+      background: #21262d;
+      border-radius: 6px;
+    }
+    .chart-scroll::-webkit-scrollbar-thumb {
+      background: #484f58;
+      border-radius: 6px;
+      border: 2px solid #21262d;
+    }
+    .chart-scroll::-webkit-scrollbar-thumb:hover {
+      background: #6e7681;
+    }
+    .clo-note { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.5rem; }
+    #liveN { color: var(--accent); font-weight: 600; }
+    .scroll-top-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      font-size: 24px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(88,166,255,0.4);
+      transition: transform 0.2s ease, background 0.2s ease;
+      z-index: 1000;
+    }
+    .scroll-top-btn:hover {
+      background: #79b8ff;
+      transform: scale(1.1);
+    }
+    .scroll-top-btn.visible {
+      display: flex;
+    }
+    .tree-scroll {
+      overflow: auto;
+      max-height: 520px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      scrollbar-gutter: stable;
+      width: 100%;
+    }
+    .tree-scroll svg {
+      min-width: 720px;
+      min-height: 400px;
+      display: block;
+      width: auto;
+      height: auto;
+    }
+    /* Always show scroll tracks in supporting browsers */
+    .tree-scroll {
+      scrollbar-width: thin;
+    }
+    .tree-scroll::-webkit-scrollbar {
+      width: 14px;
+      height: 14px;
+    }
+    .tree-scroll::-webkit-scrollbar-track {
+      background: #21262d;
+      border-radius: 6px;
+    }
+    .tree-scroll::-webkit-scrollbar-thumb {
+      background: #484f58;
+      border-radius: 6px;
+      border: 2px solid #21262d;
+    }
+    .tree-scroll::-webkit-scrollbar-thumb:hover {
+      background: #6e7681;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Rod Cutting — Dynamic Programming Visualizer</h1>
+    <p class="meta">Using rod <em>n</em> = <span id="liveN">—</span> for rod, DP table, and tree. Chart range is ≥ this <em>n</em>.</p>
+
+    <div class="layout">
+      <aside class="controls">
+        <h2>Input</h2>
+        <label>Rod length <em>n</em> (1–22)</label>
+        <input type="number" id="inpN" min="1" max="22" value="5" step="1" />
+        <label>Prices <em>p<sub>1</sub>…p<sub>n</sub></em></label>
+        <textarea id="inpPrices" spellcheck="false">2,7,9,10,11</textarea>
+        <div class="row">
+          <button type="button" data-preset="clrs">CLRS n=10</button>
+          <button type="button" data-preset="small">n=5</button>
+          <button type="button" data-preset="greedy">n=4 greedy-fail</button>
+          <button type="button" data-preset="big">n=12</button>
+          <button type="button" data-preset="xl">n=15</button>
+        </div>
+
+        <h2>Playback</h2>
+        <div class="row">
+          <button type="button" id="btnBuild" class="primary">Build Steps</button>
+          <button type="button" id="btnStep">Step</button>
+          <button type="button" id="btnPlay">Play</button>
+          <button type="button" id="btnPause">Pause</button>
+          <button type="button" id="btnReset">Reset</button>
+        </div>
+        <div class="speed-wrap">
+          <label>Speed: <strong id="speedLabel">1×</strong></label>
+          <input type="range" id="speedSlider" min="0.25" max="4" step="0.25" value="1" />
+        </div>
+        <p class="meta">Step: <span class="step-badge" id="stepCounter">0 / 0</span></p>
+        <p class="meta">Status: <span class="status idle" id="statusEl">Idle</span></p>
+
+        <h2>Statistics</h2>
+        <div class="counters">
+          <div><span>DP comparisons:</span> <strong id="c_cmp">0</strong></div>
+          <div><span>DP relaxations:</span> <strong id="c_rel">0</strong></div>
+          <div><span>Naive calls (count):</span> <strong id="c_rec">0</strong></div>
+          <div><span>Table cells:</span> <strong id="c_sub">0</strong></div>
+        </div>
+
+        <h2>CLO-1 · Growth chart</h2>
+        <label>Axis max <em>n</em> (plots 1…max; auto ≥ rod <em>n</em>)</label>
+        <input type="number" id="chartN" min="2" max="26" value="16" step="1" />
+        <button type="button" id="btnChart">Redraw chart</button>
+        <p class="clo-note">Green: DP inner ops ~ n(n+1)/2. Blue: naive recursion calls. Red dashed: 2<sup>n−1</sup>.</p>
+
+        <details class="edu"><summary>Algorithm overview</summary>
+          <div class="inner">
+            <p><code>r[j] = max<sub>1≤i≤j</sub>(p[i] + r[j−i])</code>, <code>r[0]=0</code>. Bottom-up fills <code>r[1…n]</code>. Naive recursion repeats subproblems; red rings in the tree show lengths that appear more than once.</p>
+            <p class="keybox">Changing <em>n</em> updates the rod and chart. <strong>Build Steps</strong>, then Step/Play: the recursion tree grows with the animation (naive CutRod preorder, capped for very large problem sizes—scroll horizontally if needed).</p>
+          </div>
+        </details>
+      </aside>
+
+      <main class="main">
+        <div class="legend">
+          <span><i style="background:var(--border)"></i>Empty</span>
+          <span><i style="background:var(--compare)"></i>Candidate</span>
+          <span><i style="background:var(--green)"></i>Filled (DP result)</span>
+          <span><i style="background:var(--accent)"></i>Current j</span>
+          <span><i style="background:var(--red)"></i>Overlapping subproblem (tree)</span>
+        </div>
+
+        <div class="viz-block">
+          <div class="viz-title">Rod (markers 0…n)</div>
+          <svg id="svgRod" width="640" height="100" viewBox="0 0 640 100"></svg>
+        </div>
+        <div class="viz-block">
+          <div class="viz-title">DP table r[0…n]</div>
+          <svg id="svgDp" width="720" height="120" viewBox="0 0 720 120"></svg>
+        </div>
+        <div class="viz-block">
+          <div class="viz-title">Naive CutRod tree — grows during Step/Play (scroll if wide)</div>
+          <div class="tree-scroll">
+            <svg id="svgTree" width="720" height="400" viewBox="0 0 720 400"></svg>
+          </div>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin:0.5rem 0 0;">
+            🔴 Red nodes show repeated subproblems → this is why recursion is inefficient.
+          </p>
+        </div>
+
+        <div class="explain" id="explainBox">Loading…</div>
+
+        <div class="dp-explain">
+          <h3>Dynamic Programming Concept</h3>
+          <p><strong>CLO-2 (Searching):</strong> We are searching for the best cut by checking all possible i values from 1 to j. If we skip checking some cuts, we may miss the optimal solution.</p>
+          <p><strong>CLO-3 (DP Paradigm):</strong> This algorithm uses <strong>Dynamic Programming</strong> because:</p>
+          <ul>
+            <li>It breaks the problem into smaller subproblems (optimal substructure)</li>
+            <li>It stores results in a table r[0…n] (memoization/tabulation)</li>
+            <li>It avoids recomputation (shown by red nodes in recursion tree)</li>
+          </ul>
+          <p style="margin:0.5rem 0 0; color:var(--red);"><strong>CLO-1 (Worst Case):</strong> Without DP, recursion explores all 2^(n−1) possibilities — exponential time!</p>
+        </div>
+
+        <div class="pseudocode-wrap"><div class="pseudocode" id="pseudoLines"></div></div>
+
+        <div class="viz-block viz-chart">
+          <div class="viz-title">Growth vs n — use scrollbars below</div>
+          <div class="chart-scroll">
+            <svg id="svgChart" width="960" height="420" viewBox="0 0 960 420"></svg>
+          </div>
+        </div>
+
+        <div class="history-wrap">
+          <table class="history" id="historyTable">
+            <thead><tr><th>#</th><th>j</th><th>i</th><th>Cand</th><th>Best</th><th>Note</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <button class="scroll-top-btn" id="scrollTopBtn" title="Scroll to top">↑</button>
+
+<script>
+(function () {
+  'use strict';
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var ROD_N_MAX = 22;
+  var PREORDER_NODE_CAP = 4000;
+  var TREE_LEAF_GAP = 20;  // Reduced for compact display
+  var TREE_ROW_GAP = 32;   // Reduced for compact display
+
+  /** Always read rod length from the DOM (never a stale cache). */
+  function readRodN() {
+    var el = $('inpN');
+    if (!el) return 5;
+    if (typeof el.valueAsNumber === 'number' && !isNaN(el.valueAsNumber) && el.value !== '') {
+      var vn = Math.floor(el.valueAsNumber);
+      if (vn >= 1 && vn <= ROD_N_MAX) return vn;
+    }
+    var p = parseInt(String(el.value).trim(), 10);
+    if (!isNaN(p) && p >= 1 && p <= ROD_N_MAX) return p;
+    return 5;
+  }
+
+  function writeRodN(n) {
+    n = Math.max(1, Math.min(ROD_N_MAX, Math.floor(Number(n)) || 5));
+    $('inpN').value = String(n);
+    return n;
+  }
+
+  function readChartAxisMax() {
+    var el = $('chartN');
+    var v = el.valueAsNumber;
+    if (typeof v === 'number' && !isNaN(v) && el.value !== '') {
+      v = Math.floor(v);
+      if (v >= 2 && v <= 30) return v;
+    }
+    var p = parseInt(String(el.value).trim(), 10);
+    if (!isNaN(p) && p >= 2 && p <= 30) return p;
+    return 16;
+  }
+
+  function naiveCallsTable(upTo) {
+    var t = [1];
+    for (var k = 1; k <= upTo; k++) {
+      var s = 1;
+      for (var i = 1; i <= k; i++) s += t[k - i];
+      t.push(s);
+    }
+    return t;
+  }
+
+  function naiveCalls(n) {
+    n = Math.max(0, Math.min(30, Math.floor(Number(n))));
+    return naiveCallsTable(n)[n];
+  }
+
+  /** DFS order of naive CutRod calls (same branching order as code: i=1..L). Stops at cap nodes. */
+  function buildPreorderCapped(len, cap) {
+    var out = [];
+    var nextId = 0;
+    function visit(L, parentId) {
+      if (out.length >= cap) return;
+      var id = nextId++;
+      out.push({ id: id, len: L, parent: parentId });
+      if (L === 0) return;
+      for (var i = 1; i <= L; i++) {
+        visit(L - i, id);
+        if (out.length >= cap) return;
+      }
+    }
+    visit(len, null);
+    return out;
+  }
+
+  function assignFrameTreeReveals(frames, np) {
+    if (!frames.length || np < 1) return;
+    var innerN = 0;
+    for (var i = 0; i < frames.length; i++) {
+      if (frames[i].phase === 'inner') innerN++;
+    }
+    var seenInner = 0;
+    var last = 1;
+    for (var j = 0; j < frames.length; j++) {
+      if (frames[j].phase === 'inner') {
+        seenInner++;
+        last = Math.min(np, Math.max(1, Math.round(seenInner * np / Math.max(innerN, 1))));
+      }
+      frames[j].treeReveal = last;
+    }
+    var acc = 1;
+    for (var z = 0; z < frames.length; z++) {
+      acc = Math.max(acc, frames[z].treeReveal);
+      frames[z].treeReveal = acc;
+    }
+    frames[frames.length - 1].treeReveal = np;
+  }
+
+  function syncPricesToRodN(rodN) {
+    rodN = Math.max(1, Math.min(ROD_N_MAX, Math.floor(rodN)));
+    var raw = $('inpPrices').value.split(/[\s,]+/).filter(Boolean).map(Number).filter(function (x) { return isFinite(x); });
+    var out;
+    if (raw.length >= rodN) out = raw.slice(0, rodN);
+    else if (raw.length > 0) {
+      out = raw.slice();
+      var pad = raw[raw.length - 1];
+      while (out.length < rodN) out.push(pad);
+    } else {
+      var def = [1, 5, 8, 9, 10, 17, 17, 20, 24, 30, 32, 35, 38, 40, 42, 45, 48, 50, 52, 55, 58, 60, 62];
+      while (def.length < rodN) def.push(def[def.length - 1] + 3);
+      out = def.slice(0, rodN);
+    }
+    $('inpPrices').value = out.join(',');
+    return out;
+  }
+
+  var state = {
+    frames: [],
+    idx: 0,
+    builtForN: null,
+    status: 'idle',
+    timer: null,
+    prices: [],
+    naivePreorder: null,
+    naiveTreeTruncated: false,
+  };
+
+  var PSEUDO = [
+    { num: 1, text: 'ROD-CUT-BOTTOM-UP(p, n)', tip: 'Entry' },
+    { num: 2, text: '  r[0..n] ← new array', tip: 'Revenue table' },
+    { num: 3, text: '  r[0] ← 0', tip: 'Base' },
+    { num: 4, text: '  for j ← 1 to n', tip: 'Outer loop' },
+    { num: 5, text: '    q ← −∞', tip: 'Reset best' },
+    { num: 6, text: '    for i ← 1 to j', tip: 'Try first piece i' },
+    { num: 7, text: '      q ← max(q, p[i] + r[j−i])', tip: 'Relax' },
+    { num: 8, text: '    r[j] ← q', tip: 'Commit r[j]' },
+    { num: 9, text: '  return r[n]', tip: 'Done' },
+  ];
+
+  var pseudoEl = $('pseudoLines');
+  PSEUDO.forEach(function (row) {
+    var div = document.createElement('div');
+    div.className = 'line';
+    div.dataset.line = String(row.num);
+    div.title = row.tip;
+    div.innerHTML = '<span class="ln">' + row.num + '</span><span>' + escapeHtml(row.text) + '</span>';
+    pseudoEl.appendChild(div);
+  });
+
+  function setStatus(s) {
+    state.status = s;
+    var map = { idle: 'Idle', ready: 'Ready', playing: 'Playing', paused: 'Paused', done: 'Done' };
+    $('statusEl').textContent = map[s] || s;
+    $('statusEl').className = 'status ' + s;
+  }
+
+  function invalidateStepsIfRodChanged() {
+    var domN = readRodN();
+    if (state.builtForN !== null && domN !== state.builtForN) {
+      state.frames = [];
+      state.idx = 0;
+      state.builtForN = null;
+      state.naivePreorder = null;
+      state.naiveTreeTruncated = false;
+      $('historyTable').querySelector('tbody').innerHTML = '';
+      setStatus('idle');
+      $('stepCounter').textContent = '0 / 0';
+      $('explainBox').innerHTML = 'Rod length is now <strong>' + domN + '</strong>. Click <strong>Build Steps</strong>.';
+    }
+  }
+
+  function makePreviewFrame(n) {
+    var r = new Array(n + 1);
+    for (var i = 0; i <= n; i++) r[i] = null;
+    r[0] = 0;
+    return {
+      n: n,
+      phase: 'preview',
+      j: 0,
+      i: 0,
+      line: 2,
+      r: r,
+      cand: null,
+      best: null,
+      cmp: 0,
+      rel: 0,
+      treeReveal: 1,
+      explain: 'Preview for <strong>n=' + n + '</strong>. Click <strong>Build Steps</strong> to compute steps.',
+    };
+  }
+
+  function currentFrame() {
+    var domN = readRodN();
+    $('liveN').textContent = String(domN);
+    if (state.frames.length > 0 && state.builtForN === domN && state.frames[state.idx]) {
+      return state.frames[state.idx];
+    }
+    return makePreviewFrame(domN);
+  }
+
+  function drawRod(f) {
+    var n = f.n;
+    var svg = $('svgRod');
+    var w = 640, h = 100, m = 40;
+    var barW = w - m * 2;
+    var seg = barW / Math.max(n, 1);
+    var j = f.j > 0 ? f.j : n;
+    if (f.phase === 'preview' || f.phase === 'idle') j = n;
+    var s = '';
+    s += '<text x="' + m + '" y="22" fill="#8b949e" font-size="12">0…' + n + ' · j=' + (f.phase === 'done' ? n : (f.j || '—')) + '</text>';
+    s += '<rect x="' + m + '" y="38" width="' + barW + '" height="28" rx="4" fill="#21262d" stroke="#30363d"/>';
+    for (var k = 0; k <= n; k++) {
+      var x = m + k * seg;
+      var thick = (f.phase !== 'preview' && f.phase !== 'idle' && k === (f.j || 0) && f.phase !== 'done') ? 2 : 0.5;
+      s += '<line x1="' + x + '" y1="36" x2="' + x + '" y2="70" stroke="#58a6ff" stroke-width="' + thick + '"/>';
+    }
+    var focusLen = (f.phase === 'inner' || f.phase === 'relax') && f.j > 0 ? f.j : n;
+    s += '<rect x="' + m + '" y="38" width="' + (focusLen * seg) + '" height="28" fill="rgba(88,166,255,0.12)" style="transition:width 200ms ease"/>';
+    if ((f.phase === 'inner' || f.phase === 'relax') && f.i > 0) {
+      s += '<rect x="' + (m + (f.j - f.i) * seg) + '" y="38" width="' + (f.i * seg) + '" height="28" fill="rgba(240,136,62,0.25)"/>';
+      s += '<text x="' + (m + barW / 2) + '" y="88" fill="#f0883e" font-size="10" text-anchor="middle">first piece i=' + f.i + '</text>';
+    }
+    svg.innerHTML = s;
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+  }
+
+  function drawDp(f) {
+    var n = f.n;
+    var svg = $('svgDp');
+    var cell = Math.min(52, 720 / (n + 2));
+    var x0 = 20, y0 = 35;
+    var s = '<text x="' + x0 + '" y="20" fill="#8b949e" font-size="12">r[0…' + n + ']</text>';
+    for (var k = 0; k <= n; k++) {
+      var x = x0 + k * cell;
+      var val = f.r[k];
+      var fill = '#161b22';
+      if (val != null && (k < f.j || f.phase === 'done')) fill = k === 0 ? '#21262d' : 'rgba(63,185,80,0.2)';
+      if (f.phase !== 'preview' && f.phase !== 'init' && f.phase !== 'line3' && k === f.j) fill = 'rgba(88,166,255,0.25)';
+      if (f.phase === 'inner' || f.phase === 'relax') {
+        if (f.j > 0 && k === f.j - f.i) fill = 'rgba(240,136,62,0.35)';
+        if (k === f.j) fill = 'rgba(88,166,255,0.3)';
+      }
+      s += '<rect x="' + x + '" y="' + y0 + '" width="' + (cell - 4) + '" height="' + cell + '" rx="4" fill="' + fill + '" stroke="#30363d"/>';
+      s += '<text x="' + (x + (cell - 4) / 2) + '" y="' + (y0 + 22) + '" fill="#8b949e" font-size="11" text-anchor="middle">[' + k + ']</text>';
+      s += '<text x="' + (x + (cell - 4) / 2) + '" y="' + (y0 + 42) + '" fill="#e6edf3" font-size="13" font-weight="600" text-anchor="middle">' + (val == null ? '—' : String(val)) + '</text>';
+    }
+    svg.innerHTML = s;
+    var totalW = x0 + (n + 1) * cell + 20;
+    svg.setAttribute('viewBox', '0 0 ' + totalW + ' ' + (y0 + cell + 30));
+    svg.setAttribute('width', String(Math.min(900, totalW)));
+  }
+
+  function drawTreeFromFrame(f) {
+    var svg = $('svgTree');
+    var rodN = f.n;
+    var reveal = (f.treeReveal != null) ? f.treeReveal : 1;
+
+    if (!state.naivePreorder || state.builtForN !== rodN || state.naivePreorder.length === 0) {
+      var W0 = 400, H0 = 120, m0 = 20;
+      var msg = 'Build Steps to grow the CutRod tree with playback.';
+      svg.innerHTML = '<text x="' + m0 + '" y="40" fill="#8b949e" font-size="12">' + escapeHtml(msg) + '</text><circle cx="' + (W0 / 2) + '" cy="85" r="14" fill="#161b22" stroke="#58a6ff" stroke-width="2"/><text x="' + (W0 / 2) + '" y="89" fill="#e6edf3" font-size="11" text-anchor="middle">' + rodN + '</text>';
+      svg.setAttribute('viewBox', '0 0 ' + W0 + ' ' + H0);
+      svg.setAttribute('width', '100%');
+      return;
+    }
+
+    // Limit displayed nodes for better visibility (academic focus on overlapping subproblems)
+    var DISPLAY_NODE_LIMIT = 200;
+    var list = state.naivePreorder;
+    
+    // Show warning for large n
+    if (rodN > 8) {
+      var W0 = 480, H0 = 160, m0 = 20;
+      svg.innerHTML = '<text x="' + m0 + '" y="30" fill="#d29922" font-size="13">⚠ Tree too large for n=' + rodN + '</text>' +
+        '<text x="' + m0 + '" y="60" fill="#8b949e" font-size="12">Reduce n to ≤8 to see full recursion tree.</text>' +
+        '<text x="' + m0 + '" y="90" fill="#8b949e" font-size="12">Showing first ' + Math.min(reveal, DISPLAY_NODE_LIMIT) + ' of ' + list.length + ' nodes...</text>' +
+        '<text x="' + m0 + '" y="120" fill="#f85149" font-size="11">🔴 Red nodes = overlapping subproblems (inefficient)</text>';
+      svg.setAttribute('viewBox', '0 0 ' + W0 + ' ' + H0);
+      svg.setAttribute('width', '100%');
+      // Still cap the reveal for performance
+      reveal = Math.min(reveal, DISPLAY_NODE_LIMIT);
+    } else {
+      reveal = Math.min(reveal, DISPLAY_NODE_LIMIT);
+    }
+
+    var list = state.naivePreorder;
+    reveal = Math.max(1, Math.min(reveal, list.length));
+    var visible = list.slice(0, reveal);
+    var inSet = {};
+    for (var t = 0; t < visible.length; t++) inSet[visible[t].id] = true;
+
+    var counts = {};
+    for (var u = 0; u < visible.length; u++) {
+      var L = visible[u].len;
+      if (L > 0) counts[L] = (counts[L] || 0) + 1;
+    }
+    var overlap = {};
+    for (var Lk in counts) {
+      if (counts.hasOwnProperty(Lk) && counts[Lk] > 1) overlap[Lk] = true;
+    }
+
+    var children = {};
+    for (var v = 0; v < visible.length; v++) children[visible[v].id] = [];
+    for (var e = 0; e < visible.length; e++) {
+      var node = visible[e];
+      if (node.parent != null && inSet[node.parent]) {
+        children[node.parent].push(node.id);
+      }
+    }
+
+    var root = 0;
+    var depth = {};
+    function setD(uid, d) {
+      depth[uid] = d;
+      (children[uid] || []).forEach(function (c) { setD(c, d + 1); });
+    }
+    setD(root, 0);
+
+    var posXint = {};
+    var leafSlot = 0;
+    function layout(uid) {
+      var ch = children[uid] || [];
+      if (!ch.length) {
+        posXint[uid] = leafSlot++;
+        return;
+      }
+      ch.forEach(layout);
+      var xs = ch.map(function (c) { return posXint[c]; });
+      posXint[uid] = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
+    }
+    layout(root);
+
+    var leaves = Math.max(1, leafSlot);
+    var marginX = 32;
+    var marginTop = 44;
+    var rR = 13;
+    var contentW = marginX * 2 + Math.max(0, leaves - 1) * TREE_LEAF_GAP + TREE_LEAF_GAP;
+    var W = Math.max(480, contentW);
+    var maxDp = 0;
+    for (var di = 0; di < visible.length; di++) maxDp = Math.max(maxDp, depth[visible[di].id]);
+    var H = Math.max(260, marginTop + maxDp * TREE_ROW_GAP + rR * 2 + 36);
+
+    function px(uid) {
+      return marginX + posXint[uid] * TREE_LEAF_GAP;
+    }
+    function py(uid) {
+      return marginTop + depth[uid] * TREE_ROW_GAP;
+    }
+
+    var s = '';
+    var note = 'Nodes ' + reveal + ' / ' + list.length;
+    if (rodN > 8) {
+      note += ' · Limited display (n>8). Focus on red overlapping nodes.';
+    } else if (state.naiveTreeTruncated) {
+      note += ' (truncated naive tree; n=' + rodN + ')';
+    } else {
+      note += ' · naïve CutRod DFS · red = repeated length';
+    }
+    s += '<text x="' + marginX + '" y="24" fill="#8b949e" font-size="11">' + escapeHtml(note) + '</text>';
+
+    for (var e2 = 0; e2 < visible.length; e2++) {
+      var nd = visible[e2];
+      if (nd.parent != null && inSet[nd.parent]) {
+        var a = nd.parent, b = nd.id;
+        s += '<line x1="' + px(a) + '" y1="' + (py(a) + rR) + '" x2="' + px(b) + '" y2="' + (py(b) - rR) + '" stroke="#484f58" stroke-width="1.2"/>';
+      }
+    }
+    for (var e3 = 0; e3 < visible.length; e3++) {
+      var nd2 = visible[e3];
+      var o = overlap[nd2.len];
+      var stroke = o ? '#f85149' : '#58a6ff';
+      var sw = o ? 2.6 : 2;
+      s += '<circle cx="' + px(nd2.id) + '" cy="' + py(nd2.id) + '" r="' + rR + '" fill="#161b22" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+      s += '<text x="' + px(nd2.id) + '" y="' + (py(nd2.id) + 4) + '" fill="#e6edf3" font-size="10" text-anchor="middle">' + nd2.len + '</text>';
+    }
+
+    svg.innerHTML = s;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('width', String(W));
+  }
+
+  function chartAxisMaxEffective() {
+    var axis = readChartAxisMax();
+    var rod = readRodN();
+    return Math.max(2, Math.min(30, Math.max(axis, rod)));
+  }
+
+  function drawChart() {
+    var maxN = chartAxisMaxEffective();
+    $('chartN').value = String(maxN);
+    var svg = $('svgChart');
+    // Medium-large graph size for better visibility
+    var W = 1200, H = 600, L = 70, T = 40;
+    var R = 40, B = 60;
+    var cw = W - L - R;
+    var ch = H - T - B;
+    var recTbl = naiveCallsTable(maxN);
+    var maxY = 1;
+    var dpPts = [], recPts = [], thPts = [];
+    for (var n = 1; n <= maxN; n++) {
+      var dpOps = (n * (n + 1)) / 2;
+      var rec = recTbl[n] - 1;
+      var th = Math.pow(2, Math.max(0, n - 1));
+      dpPts.push({ n: n, v: dpOps });
+      recPts.push({ n: n, v: rec });
+      thPts.push({ n: n, v: th });
+      maxY = Math.max(maxY, dpOps, rec, th);
+    }
+    
+    // Use logarithmic-like scaling for very large values to keep graph readable
+    var useLogScale = maxY > 50000;
+    var scaleY;
+    if (useLogScale) {
+      // Logarithmic Y scale for large ranges
+      var logMax = Math.log(maxY + 1);
+      scaleY = function (v) { return T + ch - (Math.log(v + 1) / logMax) * ch; };
+    } else {
+      scaleY = function (v) { return T + ch - (v / maxY) * ch; };
+    }
+    
+    var scaleX = function (n) { return L + ((n - 1) / Math.max(1, maxN - 1)) * cw; };
+    var s = '<rect width="' + W + '" height="' + H + '" fill="transparent"/>';
+    var titleText = '1 ≤ n ≤ ' + maxN + ' (rod n=' + readRodN() + ')';
+    if (useLogScale) {
+      titleText += ' · Log scale for large values';
+    }
+    s += '<text x="' + L + '" y="22" fill="#8b949e" font-size="14">' + escapeHtml(titleText) + '</text>';
+    s += '<line x1="' + L + '" y1="' + T + '" x2="' + L + '" y2="' + (T + ch) + '" stroke="#30363d" stroke-width="1.5"/>';
+    s += '<line x1="' + L + '" y1="' + (T + ch) + '" x2="' + (L + cw) + '" y2="' + (T + ch) + '" stroke="#30363d" stroke-width="1.5"/>';
+    function pathLine(pts, color, dash) {
+      var d = '';
+      for (var i = 0; i < pts.length; i++) {
+        var p = pts[i];
+        d += (i ? ' L ' : 'M ') + scaleX(p.n) + ' ' + scaleY(p.v);
+      }
+      s += '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5"' + (dash ? ' stroke-dasharray="8 5"' : '') + '/>';
+    }
+    pathLine(dpPts, '#3fb950', false);
+    pathLine(recPts, '#58a6ff', false);
+    pathLine(thPts, '#f85149', true);
+    s += '<text x="' + L + '" y="' + (H - 15) + '" fill="#3fb950" font-size="13">● DP</text>';
+    s += '<text x="' + (L + 60) + '" y="' + (H - 15) + '" fill="#58a6ff" font-size="13">● Naive</text>';
+    s += '<text x="' + (L + 160) + '" y="' + (H - 15) + '" fill="#f85149" font-size="13">--- 2^(n−1)</text>';
+    svg.innerHTML = s;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('width', String(W));
+    svg.setAttribute('height', String(H));
+    svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+  }
+
+  function highlightLine(num) {
+    pseudoEl.querySelectorAll('.line').forEach(function (el) { el.classList.remove('active'); });
+    var t = pseudoEl.querySelector('.line[data-line="' + num + '"]');
+    if (t) {
+      t.classList.add('active');
+      // Only scroll into view if pseudocode is not visible
+      // t.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  function paintAll() {
+    var f = currentFrame();
+    $('explainBox').innerHTML = f.explain;
+    highlightLine(f.line);
+    $('c_cmp').textContent = String(f.cmp);
+    $('c_rel').textContent = String(f.rel);
+    $('c_sub').textContent = String(f.n + 1);
+    $('c_rec').textContent = String(naiveCalls(f.n));
+    drawRod(f);
+    drawDp(f);
+    drawTreeFromFrame(f);
+    var total = state.frames.length;
+    if (total && state.builtForN === readRodN()) {
+      $('stepCounter').textContent = (state.idx + 1) + ' / ' + total;
+    } else {
+      $('stepCounter').textContent = '0 / ' + (total || 0);
+    }
+  }
+
+  function parseAndBuildFrames() {
+    writeRodN(readRodN());
+    var n = readRodN();
+    syncPricesToRodN(n);
+    var parts = $('inpPrices').value.split(/[\s,]+/).filter(Boolean).map(Number);
+    if (parts.length !== n) {
+      window.alert('Need exactly ' + n + ' prices.');
+      return false;
+    }
+    if (parts.some(function (x) { return !isFinite(x) || x < 0; })) {
+      window.alert('Prices must be non-negative numbers.');
+      return false;
+    }
+    var prices = [0].concat(parts);
+    state.prices = prices;
+    var frames = [];
+    var cmp = 0, rel = 0;
+    function push(o) { frames.push(o); }
+
+    var r0 = new Array(n + 1);
+    for (var z = 0; z <= n; z++) r0[z] = null;
+    r0[0] = 0;
+    push({
+      n: n, phase: 'init', line: 2, j: 0, i: 0, r: r0.slice(), cand: null, best: null, cmp: cmp, rel: rel,
+      explain: 'Allocate r[0…' + n + '], set r[0]=0.',
+    });
+    push({
+      n: n, phase: 'line3', line: 3, j: 0, i: 0, r: Object.assign([], frames[0].r), cand: null, best: null, cmp: cmp, rel: rel,
+      explain: 'Base: r[0]=0.',
+    });
+
+    for (var j = 1; j <= n; j++) {
+      push({
+        n: n, phase: 'j_start', line: 4, j: j, i: 0, r: Object.assign([], frames[frames.length - 1].r), cand: null, best: null, cmp: cmp, rel: rel,
+        explain: 'Compute r[' + j + '] (rod length j).',
+      });
+      var q = -Infinity;
+      push({
+        n: n, phase: 'q_init', line: 5, j: j, i: 0, r: Object.assign([], frames[frames.length - 1].r), cand: null, best: q, cmp: cmp, rel: rel,
+        explain: 'q ← −∞ for j=' + j + '.',
+      });
+      for (var i = 1; i <= j; i++) {
+        cmp++;
+        var rPrev = frames[frames.length - 1].r;
+        var cand = prices[i] + rPrev[j - i];
+        rel++;
+        push({
+          n: n, phase: 'inner', line: 6, j: j, i: i, r: Object.assign([], rPrev), cand: cand, best: q, cmp: cmp, rel: rel,
+          explain: 'Try i=' + i + ': p[' + i + ']+r[' + (j - i) + ']=' + prices[i] + '+' + rPrev[j - i] + '=' + cand + '.',
+        });
+        var prevQ = q;
+        q = Math.max(q, cand);
+        push({
+          n: n, phase: 'relax', line: 7, j: j, i: i, r: Object.assign([], rPrev), cand: cand, best: q, cmp: cmp, rel: rel,
+          explain: 'q ← max(' + (prevQ === -Infinity ? '−∞' : prevQ) + ', ' + cand + ') = ' + q + '.',
+        });
+      }
+      var rNew = Object.assign([], frames[frames.length - 1].r);
+      rNew[j] = q;
+      push({
+        n: n, phase: 'assign', line: 8, j: j, i: 0, r: rNew, cand: null, best: q, cmp: cmp, rel: rel,
+        explain: 'r[' + j + '] ← ' + q + '.',
+      });
+    }
+    var finalR = Object.assign([], frames[frames.length - 1].r);
+    push({
+      n: n, phase: 'done', line: 9, j: n, i: 0, r: finalR, cand: null, best: finalR[n], cmp: cmp, rel: rel,
+      explain: 'Optimal revenue r[' + n + '] = ' + finalR[n] + '.',
+    });
+
+    for (var idx = 0; idx < frames.length; idx++) {
+      frames[idx].stepIndex = idx;
+    }
+
+    state.naivePreorder = buildPreorderCapped(n, PREORDER_NODE_CAP);
+    var wouldBe = naiveCalls(n);
+    state.naiveTreeTruncated = state.naivePreorder.length >= PREORDER_NODE_CAP || state.naivePreorder.length < wouldBe;
+    assignFrameTreeReveals(frames, state.naivePreorder.length);
+
+    state.frames = frames;
+    state.idx = 0;
+    state.builtForN = n;
+    $('historyTable').querySelector('tbody').innerHTML = '';
+    setStatus('ready');
+    paintAll();
+    drawChart();
+    return true;
+  }
+
+  function appendHist(f) {
+    if (f.phase === 'init' || f.phase === 'line3' || f.phase === 'q_init') return;
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + f.stepIndex + '</td><td>' + f.j + '</td><td>' + f.i + '</td><td>' + (f.cand == null ? '—' : f.cand) + '</td><td>' + (f.best == null ? '—' : f.best) + '</td><td>' + escapeHtml(String(f.phase || '')) + '</td>';
+    tr.dataset.idx = String(f.stepIndex);
+    tr.onclick = function () {
+      state.timer && clearTimeout(state.timer);
+      state.timer = null;
+      state.idx = Math.max(0, Math.min(state.frames.length - 1, parseInt(tr.dataset.idx, 10)));
+      paintAll();
+    };
+    var tb = $('historyTable').querySelector('tbody');
+    tb.appendChild(tr);
+    while (tb.rows.length > 28) tb.deleteRow(0);
+  }
+
+  function stepOnce() {
+    if (!state.frames.length || state.builtForN !== readRodN()) return;
+    if (state.idx >= state.frames.length - 1) {
+      setStatus('done');
+      return;
+    }
+    var next = state.frames[state.idx + 1];
+    appendHist(next);
+    state.idx++;
+    paintAll();
+    if (state.idx >= state.frames.length - 1) {
+      setStatus('done');
+      state.timer && clearTimeout(state.timer);
+      state.timer = null;
+    }
+  }
+
+  function playLoop() {
+    if (state.status !== 'playing') return;
+    if (state.idx >= state.frames.length - 1) {
+      setStatus('done');
+      return;
+    }
+    var spd = Number($('speedSlider').value) || 1;
+    $('speedLabel').textContent = spd + '×';
+    state.timer = setTimeout(function () {
+      stepOnce();
+      playLoop();
+    }, 420 / spd);
+  }
+
+  function applyPreset(key) {
+    var presets = {
+      clrs: { n: 10, p: '1,5,8,9,10,17,17,20,24,30' },
+      small: { n: 5, p: '2,7,9,10,11' },
+      greedy: { n: 4, p: '1,5,8,7' },
+      big: { n: 12, p: '1,2,3,4,5,6,7,8,9,10,11,100' },
+      xl: { n: 15, p: '1,2,3,4,5,6,7,8,9,10,11,12,13,14,120' },
+    };
+    var x = presets[key];
+    if (!x) return;
+    writeRodN(x.n);
+    $('inpPrices').value = x.p;
+    state.frames = [];
+    state.idx = 0;
+    state.builtForN = null;
+    state.naivePreorder = null;
+    state.naiveTreeTruncated = false;
+    $('historyTable').querySelector('tbody').innerHTML = '';
+    setStatus('idle');
+    $('stepCounter').textContent = '0 / 0';
+    paintAll();
+    drawChart();
+  }
+
+  document.querySelectorAll('[data-preset]').forEach(function (btn) {
+    btn.addEventListener('click', function () { applyPreset(btn.getAttribute('data-preset')); });
+  });
+
+  $('btnBuild').addEventListener('click', function () {
+    clearTimeout(state.timer);
+    state.timer = null;
+    parseAndBuildFrames();
+  });
+
+  $('btnStep').addEventListener('click', function () {
+    clearTimeout(state.timer);
+    state.timer = null;
+    if (!state.frames.length) parseAndBuildFrames();
+    setStatus(state.frames.length ? 'paused' : 'idle');
+    stepOnce();
+  });
+
+  $('btnPlay').addEventListener('click', function () {
+    if (!state.frames.length) parseAndBuildFrames();
+    if (!state.frames.length) return;
+    setStatus('playing');
+    playLoop();
+  });
+
+  $('btnPause').addEventListener('click', function () {
+    clearTimeout(state.timer);
+    state.timer = null;
+    if (state.frames.length) setStatus('paused');
+  });
+
+  $('btnReset').addEventListener('click', function () {
+    clearTimeout(state.timer);
+    state.timer = null;
+    state.idx = 0;
+    $('historyTable').querySelector('tbody').innerHTML = '';
+    if (state.frames.length && state.builtForN === readRodN()) {
+      setStatus('ready');
+    } else {
+      setStatus('idle');
+    }
+    paintAll();
+  });
+
+  $('btnChart').addEventListener('click', function (e) {
+    e.preventDefault();
+    drawChart();
+  });
+
+  $('speedSlider').addEventListener('input', function () {
+    $('speedLabel').textContent = Number($('speedSlider').value) + '×';
+  });
+
+  $('inpN').addEventListener('input', function () {
+    var _v = readRodN();
+    invalidateStepsIfRodChanged();
+    paintAll();
+    drawChart();
+  });
+
+  $('inpN').addEventListener('change', function () {
+    writeRodN(readRodN());
+    syncPricesToRodN(readRodN());
+    invalidateStepsIfRodChanged();
+    paintAll();
+    drawChart();
+  });
+
+  $('inpPrices').addEventListener('change', function () {
+    syncPricesToRodN(readRodN());
+    if (state.builtForN !== null) {
+      state.frames = [];
+      state.idx = 0;
+      state.builtForN = null;
+      state.naivePreorder = null;
+      state.naiveTreeTruncated = false;
+      $('historyTable').querySelector('tbody').innerHTML = '';
+      setStatus('idle');
+    }
+    paintAll();
+    drawChart();
+  });
+
+  // Scroll to top button functionality
+  var scrollTopBtn = $('scrollTopBtn');
+  window.addEventListener('scroll', function() {
+    if (window.scrollY > 300) {
+      scrollTopBtn.classList.add('visible');
+    } else {
+      scrollTopBtn.classList.remove('visible');
+    }
+  });
+
+  scrollTopBtn.addEventListener('click', function() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  applyPreset('clrs');
+})();
+</script>
+</body>
+</html>
